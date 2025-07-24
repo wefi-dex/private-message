@@ -1,29 +1,37 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
-
+import { AuthProvider } from '@/components/AuthContext';
+import { ThemeProvider } from '@/components/ThemeContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { useFonts } from 'expo-font';
+import { Slot } from 'expo-router';
+import { ActivityIndicator, View } from 'react-native';
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  const [loaded] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
+  const [fontsLoaded] = useFonts({
+    'Sora': require('@/assets/fonts/Sora-Regular.ttf'),
+    'Sora-Bold': require('@/assets/fonts/Sora-Bold.ttf'),
+    'Sora-SemiBold': require('@/assets/fonts/Sora-SemiBold.ttf'),
+    'Sora-Medium': require('@/assets/fonts/Sora-Medium.ttf'),
+    'Sora-Light': require('@/assets/fonts/Sora-Light.ttf'),
+    'Sora-ExtraBold': require('@/assets/fonts/Sora-ExtraBold.ttf'),
+    'Sora-ExtraLight': require('@/assets/fonts/Sora-ExtraLight.ttf'),
   });
 
-  if (!loaded) {
-    // Async font loading only occurs in development.
-    return null;
+  // Force dark theme as default
+  const colorScheme = useColorScheme() || 'dark';
+
+  if (!fontsLoaded) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
   }
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <AuthProvider>
+      <ThemeProvider value={colorScheme}>
+        <Slot />
+      </ThemeProvider>
+    </AuthProvider>
   );
-}
+} 

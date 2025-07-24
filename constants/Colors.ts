@@ -14,13 +14,21 @@ export const Colors = {
     icon: '#687076',
     tabIconDefault: '#687076',
     tabIconSelected: tintColorLight,
+    primary: '#5A0FC8',
+    secondprimary:'#BD9FE9',
+    semiprimary:'#DECFF4',
+    shadeprimary:'#AD87E4',
+    fontsemi:'#F2F2F2',
+    fontthird:'#565856',
+    textbio:'#D0D0D0'
   },
   dark: {
     text: '#ECEDEE',
-    background: '#151718',
+    background: '#1C1B2D',
     tint: tintColorDark,
     icon: '#9BA1A6',
     tabIconDefault: '#9BA1A6',
     tabIconSelected: tintColorDark,
+    primary: 'white',
   },
 };

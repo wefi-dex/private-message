@@ -28,7 +28,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/splash.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
@@ -37,6 +37,19 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "EXPO_PUBLIC_BACKEND_URL": "http://192.168.15.123:8000",
+      "EXPO_PUBLIC_FIREBASE_APIKEY": "AIzaSyCzx8HrJeB_k8XqOR9nl-pQ0rnkdnwlaf8",
+      "EXPO_PUBLIC_FIREBASE_AUTHDOMAIN": "dangvo-working.firebaseapp.com",
+      "EXPO_PUBLIC_FIREBASE_REALTIME_DATABASEURL": "https://dangvo-working-default-rtdb.firebaseio.com",
+      "EXPO_PUBLIC_FIREBASE_PROJECTID": "dangvo-working",
+      "EXPO_PUBLIC_FIREBASE_STORAGEBUCKET": "dangvo-working.appspot.com",
+      "EXPO_PUBLIC_FIREBASE_MESSAGINGSENDERID": "496201537887",
+      "EXPO_PUBLIC_FIREBASE_APPID": "1:496201537887:web:2bcdf4eefaf6fd7a127eea",
+      "EXPO_PUBLIC_FIREBASE_MEASUREMENTID": "G-0G41PVVBFT",
+      "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "765783696566-3f66s0cphc47hc2rsrgdqn2hh7ha7tpb.apps.googleusercontent.com"
     }
   }
 }
+ 
