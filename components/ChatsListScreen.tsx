@@ -32,7 +32,7 @@ const ChatListItem = memo(function ChatListItem({ item, lastMsg, onPress }: any)
         <View style={styles.avatarMiddle}>
           <View style={styles.avatarInner}>
             <Image
-              source={item.avatar && item.avatar.length > 0 ? { uri: item.avatar[0] } : defaultProfileImage}
+              source={item.avatar ? { uri: item.avatar } : defaultProfileImage}
               style={styles.avatarImg}
             />
           </View>
@@ -79,7 +79,7 @@ const StoriesRow = memo(function StoriesRow({ user, chats, navigation }: any) {
             >
               <View style={[styles.storyAvatarWrap, { borderColor: (item as any).isMe || item.id === 'my' ? '#A259FF' : '#F357A8' }] }>
                 <Image
-                  source={item.avatar && item.avatar.length > 0 ? { uri: item.avatar[0] } : defaultProfileImage}
+                  source={item.avatar ? { uri: item.avatar } : defaultProfileImage}
                   style={styles.storyAvatar}
                 />
                 {'isMe' in item && item.isMe || item.id === 'my' ? (
@@ -138,7 +138,7 @@ type ChatItem = {
 };
 
 export default function ChatsListScreen() {
-  const { user, logout } = useAuth();
+  const { user, logout, token } = useAuth();
   const navigation = useNavigation<StackNavigationProp<ChatStackParamList, 'ChatsList'>>();
   const [lastMessages, setLastMessages] = useState<{ [userId: string]: { text: string; timestamp: number; from?: string } | null }>({});
   const [profileMenuVisible, setProfileMenuVisible] = useState(false);
@@ -149,15 +149,18 @@ export default function ChatsListScreen() {
   // Fetch users from backend
   useEffect(() => {
     if (!user) return;
-    getUsers()
+    getUsers(token || undefined)
       .then(users => {
-        setChats(users.filter((u: any) => u.id !== user.id).map((u: any) => ({
+        // Only filter out current user if user.id is defined and matches
+        const filtered = users.filter((u: any) => !user.id || u.id !== user.id);
+        // Debug: log the user list
+        setChats(filtered.map((u: any) => ({
           ...u,
           displayName: u.alias || u.username || '',
         })));
       })
       .catch(e => console.log(e.message || 'Failed to load users'));
-  }, [user]);
+  }, [user, token]);
 
   // Filter chats by searchText
   const filteredChats = searchText.trim()
@@ -240,7 +243,7 @@ export default function ChatsListScreen() {
           <TouchableOpacity onPress={() => setProfileMenuVisible(true)}>
             <View style={styles.profileAvatarOuter}>
               <View style={styles.profileAvatarInner}>
-                <Image source={user?.avatar ? { uri: user.avatar[0] || user.avatar } : defaultProfileImage} style={styles.profileAvatarImg} />
+                <Image source={user?.avatar ? { uri: user.avatar } : defaultProfileImage} style={styles.profileAvatarImg} />
               </View>
               <View style={styles.profileStatusDot} />
             </View>

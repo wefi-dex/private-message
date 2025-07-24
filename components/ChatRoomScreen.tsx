@@ -123,7 +123,6 @@ export default function ChatRoomScreen(props: any) {
       Object.entries(data).forEach(([key, msg]: [string, any]) => {
         if (msg.to === user?.id && msg.status !== 'read') {
           update(ref(db, `chats/${chatId}/messages/${key}`), { status: 'read' });
-          console.log('Marking as read (on open):', key, msg.text);
         }
       });
     });
@@ -166,7 +165,6 @@ export default function ChatRoomScreen(props: any) {
       Object.entries(data).forEach(([key, msg]: [string, any]) => {
         if (msg.to === user?.id && msg.status !== 'read') {
           update(ref(db, `chats/${chatId}/messages/${key}`), { status: 'read' });
-          console.log('Marking as read (scroll/effect):', key, msg.text);
         }
       });
     });

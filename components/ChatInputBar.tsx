@@ -44,7 +44,7 @@ const ChatInputBar = ({
   const [loadingGifs, setLoadingGifs] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
-  const [recordingUri, setRecordingUri] = useState<string | null>(null);
+  const [, setRecordingUri] = useState<string | null>(null);
   const [recordingDuration, setRecordingDuration] = useState<number>(0);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
@@ -57,7 +57,7 @@ const ChatInputBar = ({
         .then(data => setGifs(data.data || []))
         .finally(() => setLoadingGifs(false));
     }
-  }, [pickerTab]);
+  }, [gifs.length, loadingGifs, pickerTab]);
 
   // Voice recording handlers
   const startRecording = async () => {
@@ -88,6 +88,7 @@ const ChatInputBar = ({
           }
         }
       }, 500);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (err) {
       setIsRecording(false);
       alert('Failed to start recording');
@@ -108,6 +109,7 @@ const ChatInputBar = ({
         console.log('Recorded audio:', uri);
       }
       setRecordingDuration(0);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (err) {
       setIsRecording(false);
       setRecording(null);
@@ -131,7 +133,8 @@ const ChatInputBar = ({
       setUploading(true);
       setUploadError('');
       try {
-        const res = await uploadFile(file);
+        // Pass file, file.name, and file.type to uploadFile as required by its signature
+        const res = await uploadFile(file, file.name, file.type);
         if (handleSendMedia) handleSendMedia({ type: 'file', url: res.url });
       } catch (err: any) {
         setUploadError(err.message || 'File upload failed');
@@ -151,7 +154,8 @@ const ChatInputBar = ({
         // Fetch the file as a blob
         const response = await fetch(file.uri);
         const blob = await response.blob();
-        const res = await uploadFile(blob);
+        // Use file.mimeType if available, otherwise fallback to empty string to satisfy type
+        const res = await uploadFile(blob, file.name, file.mimeType || '');
         if (handleSendMedia) handleSendMedia({ type: 'file', url: res.url });
       } catch (err: any) {
         setUploadError(err.message || 'File upload failed');

@@ -32,16 +32,20 @@ export async function createUser(user: Record<string, any>) {
   return res.json();
 }
 
-export async function getUser(id: string) {
-  const res = await fetch(`${BASE_URL}/user/${id}`);
+export async function getUser(id: string, token?: string) {
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(`${BASE_URL}/user/${id}`, { headers });
   if (!res.ok) throw new Error('Get user failed');
   return res.json();
 }
 
-export async function updateUser(id: string, user: Record<string, any>) {
+export async function updateUser(id: string, user: Record<string, any>, token?: string) {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
   const res = await fetch(`${BASE_URL}/user/${id}` , {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(user),
   });
   if (!res.ok) {
@@ -83,6 +87,17 @@ export async function getUsers(token?: string) {
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || 'Failed to fetch users');
   return data.data;
+}
+
+export async function checkUsernameDuplicate(username: string, token?: string) {
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(`${BASE_URL}/check-username?username=${encodeURIComponent(username)}`, {
+    headers,
+  });
+  if (!res.ok) throw new Error('Failed to check username');
+  const data = await res.json();
+  return data.available;
 }
 
 export function getFileUrl(filename: string) {

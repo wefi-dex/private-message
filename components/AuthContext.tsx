@@ -6,8 +6,8 @@ interface User {
   username: string;
   displayName: string;
   bio?: string;
-  photo?: string; // Add photo property
-  avatar?: string[]; // Add this line for avatar array
+  photo?: string;
+  avatar?: string | null; // Now a string URL or null
   alias?: string;
 }
 
@@ -15,7 +15,7 @@ interface AuthContextProps {
   user: User | null;
   token: string | null;
   login: (username: string, password: string) => Promise<boolean>;
-  register: (email: string, password: string, username: string, role: 'creator' | 'fan') => Promise<{ ok: boolean; error?: string }>;
+  register: (email: string, password: string, username: string, role: 'creator' | 'fan', alias?: string) => Promise<{ ok: boolean; error?: string }>;
   logout: () => void;
   registeredUsernames: string[];
   updateUserContext: (newUserData: Partial<User>) => void; // Add this line for updateUserContext
@@ -31,6 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (username: string, password: string) => {
     try {
       const res = await apiLogin(username, password);
+      // avatar is now a string or null
       setUser(res.user || res);
       setToken(res.token); // Save the token
       return true;
@@ -39,9 +40,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const register = async (email: string, password: string, username: string, role: 'creator' | 'fan') => {
+  const register = async (email: string, password: string, username: string, role: 'creator' | 'fan', alias?: string) => {
     try {
-      const res = await apiCreateUser({ email, password, username, role });
+      const res = await apiCreateUser({ email, password, username, role, alias });
+      // avatar is now a string or null
       setUser(res.user || res);
       setToken(res.token); // Save the token if returned
       return { ok: true };

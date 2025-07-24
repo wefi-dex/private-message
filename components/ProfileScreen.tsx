@@ -2,7 +2,7 @@ import { useAuth } from '@/components/AuthContext';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { Colors } from '@/constants/Colors';
-import { getFileUrl, getUser, updateUser, uploadFile } from '@/utils/api';
+import { getFileUrl, getUser, updateUser, uploadFile, checkUsernameDuplicate } from '@/utils/api';
 import { useNavigation } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import * as Clipboard from 'expo-clipboard';
@@ -45,7 +45,7 @@ function ProfileScreen(props: any) {
   const { user, token, logout, updateUserContext } = useAuth();
   const [username, setUsername] = useState(user?.username || '');
   const [bio, setBio] = useState(user?.bio || '');
-  const [photo, setPhoto] = useState<string | null>(user?.photo || null);
+  const [photo, setPhoto] = useState<string | null>(user?.avatar || null);
   const [showQR, setShowQR] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -58,37 +58,51 @@ function ProfileScreen(props: any) {
   const [originalUsername, setOriginalUsername] = useState(user?.username || '');
   const [originalBio, setOriginalBio] = useState(user?.bio || '');
   const [originalAlias, setOriginalAlias] = useState(user?.alias || '');
+  const [usernameError, setUsernameError] = useState('');
 
   React.useEffect(() => {
-    if (user?.id) {
-      setLoading(true);
-      getUser(user.id)
-        .then(data => {
-          setUsername(data.username || '');
-          setBio(data.bio || '');
-          setPhoto(data.photo || null);
-          setAlias(data.alias || '');
-          setOriginalUsername(data.username || '');
-          setOriginalBio(data.bio || '');
-          setOriginalAlias(data.alias || '');
-        })
-        .catch(() => setError('Failed to load user info'))
-        .finally(() => setLoading(false));
+    if (user) {
+      setUsername(user.username || '');
+      setBio(user.bio || '');
+      setPhoto(user.avatar || null);
+      setAlias(user.alias || '');
+      setOriginalUsername(user.username || '');
+      setOriginalBio(user.bio || '');
+      setOriginalAlias(user.alias || '');
     }
-  }, [user?.id]);
+  }, [user]);
+
+  const handleUsernameChange = async (val: string) => {
+    setUsername(val);
+    setUsernameError('');
+    if (val && val !== originalUsername) {
+      try {
+        const available = await checkUsernameDuplicate(val, token || undefined);
+        if (!available) {
+          setUsernameError('Username is already taken');
+        }
+      } catch {
+        setUsernameError('Failed to check username');
+      }
+    }
+  };
 
   const handleSave = async () => {
     if (!user?.id) return;
+    if (usernameError) return;
     setLoading(true);
     setError('');
     setSuccess('');
     try {
-      const res = await updateUser(user.id, { username, bio, alias });
+      const res = await updateUser(user.id, { username, bio, alias }, token || undefined);
       setSuccess('Profile updated!');
       if (res.data) {
         setUsername(res.data.username);
         setBio(res.data.bio);
         setAlias(res.data.alias);
+        setOriginalUsername(res.data.username);
+        setOriginalBio(res.data.bio);
+        setOriginalAlias(res.data.alias);
         updateUserContext(res.data); // Sync user context everywhere
       }
     } catch (e: any) {
@@ -125,7 +139,7 @@ function ProfileScreen(props: any) {
         const fileUrl = getFileUrl(uploadRes.filename); // Build the URL
         setPhoto(fileUrl);
         if (user?.id) {
-          await updateUser(user.id, { avatar: JSON.stringify([uploadRes.filename]) }); // Save as JSON array
+          await updateUser(user.id, { avatar: fileUrl }); // Save as string URL
         }
       } catch (e: any) {
         setPhotoError(e.message || 'Failed to upload photo');
@@ -149,17 +163,26 @@ function ProfileScreen(props: any) {
     }
   };
 
-  const avatarFilename = Array.isArray(user?.avatar) && user.avatar.length > 0 ? user.avatar[0] : null;
-  const photoUrl = avatarFilename ? getFileUrl(avatarFilename) : null;
   const defaultProfileImage = require('@/assets/images/default-contact-2.png');
-  const isChanged = username !== originalUsername || bio !== originalBio || alias !== originalAlias;
+  const isChanged = (username !== originalUsername || bio !== originalBio || alias !== originalAlias) && !usernameError;
+
+  // Automatically clear success and error messages after 1 minute
+  React.useEffect(() => {
+    if (success || error) {
+      const timer = setTimeout(() => {
+        setSuccess('');
+        setError('');
+      }, 60000); // 1 minute
+      return () => clearTimeout(timer);
+    }
+  }, [success, error]);
 
   return (
     <ThemedView style={styles.container}>
       {/* Profile Photo */}
       <TouchableOpacity onPress={pickImage} style={styles.photoContainer} disabled={uploadingPhoto}>
         <Image
-          source={photoUrl ? { uri: photoUrl } : defaultProfileImage}
+          source={user?.avatar ? { uri: user.avatar } : defaultProfileImage}
           style={styles.photo}
         />
         <Text style={styles.changePhotoText}>{uploadingPhoto ? 'Uploading...' : 'Change Photo'}</Text>
@@ -170,12 +193,13 @@ function ProfileScreen(props: any) {
         <Text style={styles.atSign}>@</Text>
         <TextInput
           value={username}
-          onChangeText={setUsername}
+          onChangeText={handleUsernameChange}
           placeholder="username"
           style={styles.usernameInput}
           autoCapitalize="none"
           placeholderTextColor={Colors.light.fontthird}
         />
+        {usernameError ? <Text style={{ color: 'red', fontSize: 13, marginLeft: 8 }}>{usernameError}</Text> : null}
       </View>
       {/* Alias */}
       <View style={styles.inputRow}>
@@ -199,7 +223,10 @@ function ProfileScreen(props: any) {
         maxLength={120}
         placeholderTextColor={Colors.light.fontthird}
       />
-      {error ? <Text style={{ color: 'red', marginBottom: 8 }}>{error}</Text> : null}
+      {/* Only show error for update/save actions, not for initial load */}
+      {error && error !== 'Failed to load user info' ? (
+        <Text style={{ color: 'red', marginBottom: 8 }}>{error}</Text>
+      ) : null}
       {success ? <Text style={{ color: 'green', marginBottom: 8 }}>{success}</Text> : null}
       {isChanged && (
         <TouchableOpacity onPress={handleSave} style={[styles.copyButton, { marginBottom: 12, marginTop: 8, alignSelf: 'center' }]} disabled={loading}>
@@ -247,7 +274,7 @@ function ProfileScreen(props: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, alignItems: 'center', padding: 24 },
-  photoContainer: { alignItems: 'center', marginBottom: 18, marginTop: 72 },
+  photoContainer: { alignItems: 'center', marginBottom: 18, marginTop: 64 },
   photo: { width: 110, height: 110, borderRadius: 55, marginBottom: 8, backgroundColor: '#eee' },
   changePhotoText: { color: Colors.light.fontsemi, fontSize: 13, marginBottom: 8 },
   inputRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
