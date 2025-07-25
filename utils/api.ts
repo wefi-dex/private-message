@@ -100,6 +100,69 @@ export async function checkUsernameDuplicate(username: string, token?: string) {
   return data.available;
 }
 
+export async function createUserConnection(user_id: string, target_user_id: string, token?: string) {
+  const res = await fetch(`${BASE_URL}/user/connect`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ user_id, target_user_id }),
+  });
+
+  let data;
+  try {
+    data = await res.json();
+  } catch (e: any) {
+    const text = await res.text();
+    console.error('Non-JSON response:', text);
+    throw new Error(text || 'Failed to send connection request');
+  }
+  if (!res.ok || !data.success) {
+    throw new Error(data.message || 'Failed to send connection request');
+  }
+  return data;
+}
+
+export async function getUserConnectionStatus(user_id: string, target_user_id: string, token?: string) {
+  const res = await fetch(`${BASE_URL}/user/connection-status?user_id=${user_id}&target_user_id=${target_user_id}`, {
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  let data;
+  try {
+    data = await res.json();
+  } catch (e) {
+    const text = await res.text();
+    throw new Error(text || 'Failed to get connection status');
+  }
+  if (!res.ok) {
+    throw new Error(data.message || 'Failed to get connection status');
+  }
+  return data.status;
+}
+
+export async function getUserByUsername(username: string, user_id?: string, token?: string) {
+  const url = `${BASE_URL}/by-username?username=${encodeURIComponent(username)}${user_id ? `&user_id=${user_id}` : ''}`;
+  const res = await fetch(url, {
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  let data;
+  try {
+    data = await res.json();
+  } catch (e) {
+    const text = await res.text();
+    throw new Error(text || 'Failed to get user');
+  }
+  if (!res.ok || !data.success) {
+    throw new Error(data.message || 'Failed to get user');
+  }
+  return data.data;
+}
+
 export function getFileUrl(filename: string) {
   return `${BASE_URL}/file/${filename}`;
 } 

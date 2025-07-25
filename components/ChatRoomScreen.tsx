@@ -107,7 +107,8 @@ export default function ChatRoomScreen(props: any) {
     const q = query(messagesRef, orderByChild('timestamp'));
     const handle = onValue(q, (snapshot) => {
       const data = snapshot.val() || {};
-      const msgList = Object.values(data).sort((a: any, b: any) => a.timestamp - b.timestamp);
+      // Attach the Firebase key as 'id' to each message
+      const msgList = Object.entries(data).map(([id, msg]: [string, any]) => ({ ...msg, id })).sort((a: any, b: any) => a.timestamp - b.timestamp);
       setMessages(msgList);
     });
     return () => off(q, 'value', handle);
@@ -154,7 +155,7 @@ export default function ChatRoomScreen(props: any) {
       messagesWithLabels.push({ type: 'label', label, key: `label-${label}-${msg.timestamp}` });
       lastLabel = label;
     }
-    messagesWithLabels.push({ ...msg, type: 'message', key: `msg-${i}` });
+    messagesWithLabels.push({ ...msg, type: 'message', key: msg.id || `msg-${i}` });
   }
 
   // Helper to mark all unread messages addressed to this user as read
@@ -288,6 +289,10 @@ export default function ChatRoomScreen(props: any) {
               timestamp={item.timestamp}
               status={item.status}
               showAvatar={showAvatar}
+              messageId={item.id}
+              chatId={chatId}
+              userId={user.id}
+              reactions={item.reactions || {}}
             />
           );
         }}
