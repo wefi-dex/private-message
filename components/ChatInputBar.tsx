@@ -21,6 +21,8 @@ type Props = {
   sendMessage: () => void;
   handleSendMedia?: (media: MediaPayload) => void;
   onInputHeightChange?: (height: number) => void;
+  editingMessage?: any;
+  onCancelEdit?: () => void;
 };
 
 const iconProps = { size: 22, color: '#fff' };
@@ -35,7 +37,7 @@ const STICKERS = [
 const GIPHY_TRENDING_URL = 'https://api.giphy.com/v1/gifs/trending?api_key=dc6zaTOxFJmzC&limit=24';
 
 const ChatInputBar = ({
-  input, handleInputChange, handleInputFocus, handleInputBlur, sendMessage, handleSendMedia, onInputHeightChange,
+  input, handleInputChange, handleInputFocus, handleInputBlur, sendMessage, handleSendMedia, onInputHeightChange, editingMessage, onCancelEdit,
 }: Props) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
@@ -183,7 +185,19 @@ const ChatInputBar = ({
   };
 
   return (
-    <View style={[styles.container, { flexDirection: 'row', alignItems: 'center' }]}> 
+    <View style={[styles.container, { flexDirection: 'row', alignItems: 'center' }]}>
+      {/* Edit mode indicator */}
+      {editingMessage && (
+        <View style={{ position: 'absolute', left: 8, right: 8, top: -54, backgroundColor: '#23213A', borderTopLeftRadius: 12, borderTopRightRadius: 12, padding: 8, borderBottomWidth: 1, borderBottomColor: '#35345A', flexDirection: 'row', alignItems: 'center', zIndex: 10 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: '#6B47DC', fontWeight: 'bold', fontSize: 13 }}>Editing message</Text>
+            <Text style={{ color: '#fff', fontSize: 13 }} numberOfLines={1} ellipsizeMode="tail">{editingMessage.text}</Text>
+          </View>
+          <TouchableOpacity onPress={onCancelEdit} style={{ marginLeft: 8 }}>
+            <Feather name="x" size={18} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      )}
       {/* File browser button on the far left, no background */}
       {Platform.OS === 'web' ? (
         <>
@@ -215,7 +229,7 @@ const ChatInputBar = ({
           onChangeText={handleInputChange}
           onFocus={handleInputFocus}
           onBlur={handleInputBlur}
-          placeholder="Type here..."
+          placeholder={editingMessage ? "Edit message..." : "Type here..."}
           style={styles.input}
           placeholderTextColor="#fff"
           onSubmitEditing={sendMessage}
@@ -244,7 +258,7 @@ const ChatInputBar = ({
           </View>
         )}
         <TouchableOpacity onPress={handleSend} style={styles.sendButton}>
-          <MaterialCommunityIcons name="send" size={24} color="white" />
+          <MaterialCommunityIcons name={editingMessage ? "check" : "send"} size={24} color="white" />
         </TouchableOpacity>
       </View>
       {/* Speech recognition (microphone) button on the far right, no background */}

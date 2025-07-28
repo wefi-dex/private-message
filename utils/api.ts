@@ -101,7 +101,7 @@ export async function checkUsernameDuplicate(username: string, token?: string) {
 }
 
 export async function createUserConnection(user_id: string, target_user_id: string, token?: string) {
-  const res = await fetch(`${BASE_URL}/user/connect`, {
+  const res = await fetch(`${BASE_URL}/connect`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -165,4 +165,212 @@ export async function getUserByUsername(username: string, user_id?: string, toke
 
 export function getFileUrl(filename: string) {
   return `${BASE_URL}/file/${filename}`;
+}
+
+export async function getPendingConnectionRequests(userId: string, token?: string) {
+  const res = await fetch(`${BASE_URL}/user-connection/${userId}/pending-requests`, {
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  let data;
+  try {
+    data = await res.json();
+  } catch (e) {
+    const text = await res.text();
+    throw new Error(text || 'Failed to get pending requests');
+  }
+  if (!res.ok || !data.success) {
+    throw new Error(data.message || 'Failed to get pending requests');
+  }
+  return data.data;
+}
+
+export async function respondToConnectionRequest(connectionId: string, action: 'accept' | 'reject', token?: string) {
+  const res = await fetch(`${BASE_URL}/connection/${connectionId}/respond`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ action }),
+  });
+  let data;
+  try {
+    data = await res.json();
+  } catch (e) {
+    const text = await res.text();
+    throw new Error(text || 'Failed to respond to request');
+  }
+  if (!res.ok || !data.success) {
+    throw new Error(data.message || 'Failed to respond to request');
+  }
+  return data;
+}
+
+export async function getConnectionHistory(userId: string, token?: string) {
+  const res = await fetch(`${BASE_URL}/user-connection/${userId}/history`, {
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  let data;
+  try {
+    data = await res.json();
+  } catch (e) {
+    const text = await res.text();
+    throw new Error(text || 'Failed to get connection history');
+  }
+  if (!res.ok || !data.success) {
+    throw new Error(data.message || 'Failed to get connection history');
+  }
+  return data.data;
+}
+
+export async function getConnectedUsers(userId: string, token?: string) {
+  const res = await fetch(`${BASE_URL}/user-connection/${userId}/connected`, {
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  let data;
+  try {
+    data = await res.json();
+  } catch (e) {
+    const text = await res.text();
+    throw new Error(text || 'Failed to get connected users');
+  }
+  if (!res.ok || !data.success) {
+    throw new Error(data.message || 'Failed to get connected users');
+  }
+  return data.data;
 } 
+
+// Block and Report API functions
+export async function blockUser(blockerId: string, blockedId: string, token?: string) {
+  const res = await fetch(`${BASE_URL}/block`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ blocker_id: blockerId, blocked_id: blockedId }),
+  });
+  let data;
+  try {
+    data = await res.json();
+  } catch (e) {
+    const text = await res.text();
+    throw new Error(text || 'Failed to block user');
+  }
+  if (!res.ok || !data.success) {
+    throw new Error(data.message || 'Failed to block user');
+  }
+  return data;
+}
+
+export async function unblockUser(blockerId: string, blockedId: string, token?: string) {
+  const res = await fetch(`${BASE_URL}/unblock`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ blocker_id: blockerId, blocked_id: blockedId }),
+  });
+  let data;
+  try {
+    data = await res.json();
+  } catch (e) {
+    const text = await res.text();
+    throw new Error(text || 'Failed to unblock user');
+  }
+  if (!res.ok || !data.success) {
+    throw new Error(data.message || 'Failed to unblock user');
+  }
+  return data;
+}
+
+export async function getBlockedUsers(userId: string, token?: string) {
+  const res = await fetch(`${BASE_URL}/user/${userId}/blocked`, {
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  let data;
+  try {
+    data = await res.json();
+  } catch (e) {
+    const text = await res.text();
+    throw new Error(text || 'Failed to get blocked users');
+  }
+  if (!res.ok || !data.success) {
+    throw new Error(data.message || 'Failed to get blocked users');
+  }
+  return data.data;
+}
+
+export async function checkIfBlocked(userId: string, targetUserId: string, token?: string) {
+  const res = await fetch(`${BASE_URL}/block-status?user_id=${userId}&target_user_id=${targetUserId}`, {
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  let data;
+  try {
+    data = await res.json();
+  } catch (e) {
+    const text = await res.text();
+    throw new Error(text || 'Failed to check block status');
+  }
+  if (!res.ok || !data.success) {
+    throw new Error(data.message || 'Failed to check block status');
+  }
+  return data.data;
+}
+
+export async function reportUser(reporterId: string, reportedId: string, reason: string, description?: string, token?: string) {
+  const res = await fetch(`${BASE_URL}/report`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ 
+      reporter_id: reporterId, 
+      reported_id: reportedId, 
+      reason, 
+      description 
+    }),
+  });
+  let data;
+  try {
+    data = await res.json();
+  } catch (e) {
+    const text = await res.text();
+    throw new Error(text || 'Failed to report user');
+  }
+  if (!res.ok || !data.success) {
+    throw new Error(data.message || 'Failed to report user');
+  }
+  return data;
+}
+
+export async function getUserReports(userId: string, token?: string) {
+  const res = await fetch(`${BASE_URL}/user/${userId}/reports`, {
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  let data;
+  try {
+    data = await res.json();
+  } catch (e) {
+    const text = await res.text();
+    throw new Error(text || 'Failed to get user reports');
+  }
+  if (!res.ok || !data.success) {
+    throw new Error(data.message || 'Failed to get user reports');
+  }
+  return data.data;
+}

@@ -1,7 +1,7 @@
 import { ThemedText } from '@/components/ThemedText';
 import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
-import { Image, View, TouchableWithoutFeedback, Modal, TouchableOpacity, Clipboard, Alert, useWindowDimensions, ScrollView } from 'react-native';
+import { Image, View, TouchableWithoutFeedback, Modal, TouchableOpacity, Clipboard, Alert, useWindowDimensions, ScrollView, Text } from 'react-native';
 // @ts-ignore
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import VoiceMessageBubble from './VoiceMessageBubble';
@@ -36,9 +36,17 @@ interface ChatMessageBubbleProps {
   chatId: string;
   userId: string;
   reactions: { [userId: string]: string };
+  from: string;
+  onEdit?: () => void;
+  edited?: boolean;
+  onDelete?: () => void;
+  onSelect?: () => void;
+  isSelected?: boolean;
+  isSelectionMode?: boolean;
+  onBlockReport?: (user: any) => void;
 }
 
-export default function ChatMessageBubble({ isMine, text, timestamp, status, showAvatar, user, audioUrl, audioDuration, messageId, chatId, userId, reactions }: ChatMessageBubbleProps) {
+export default function ChatMessageBubble({ isMine, text, timestamp, status, showAvatar, user, audioUrl, audioDuration, messageId, chatId, userId, reactions, from, onEdit, edited, onDelete, onSelect, isSelected, isSelectionMode, onBlockReport }: ChatMessageBubbleProps) {
   const [menuVisible, setMenuVisible] = React.useState(false);
   const [menuY, setMenuY] = React.useState<number | null>(null);
   const [menuX, setMenuX] = React.useState<number | null>(null);
@@ -74,6 +82,7 @@ export default function ChatMessageBubble({ isMine, text, timestamp, status, sho
   }
 
   const handleLongPress = (event: any) => {
+    if (isSelectionMode) return; // Disable long press menu in selection mode
     const { pageY, pageX } = event.nativeEvent;
     setMenuY(pageY);
     setMenuX(pageX);
@@ -81,11 +90,27 @@ export default function ChatMessageBubble({ isMine, text, timestamp, status, sho
   };
   const handleCloseMenu = () => setMenuVisible(false);
 
-  const handleReply = () => { setMenuVisible(false); Alert.alert('Reply', 'Reply action'); };
-  const handleDelete = () => { setMenuVisible(false); Alert.alert('Delete', 'Delete action'); };
-  const handleEdit = () => { setMenuVisible(false); Alert.alert('Edit', 'Edit action'); };
-  const handleSelect = () => { setMenuVisible(false); Alert.alert('Select', 'Select action'); };
-  const handleCopy = () => { setMenuVisible(false); Clipboard.setString(text); Alert.alert('Copied', 'Message copied to clipboard'); };
+
+  const handleDelete = () => { setMenuVisible(false); if (onDelete) onDelete(); };
+  const handleEdit = () => { setMenuVisible(false); if (onEdit) onEdit(); };
+  const handleSelect = () => { setMenuVisible(false); if (onSelect) onSelect(); };
+  const handleCopy = () => { 
+    setMenuVisible(false); 
+    const contentToCopy = audioUrl ? `Voice message (${audioDuration}s)` : text;
+    Clipboard.setString(contentToCopy); 
+    // Show a brief toast-like notification instead of alert
+    Alert.alert('✓ Copied', 'Message copied to clipboard', [{ text: 'OK' }], { cancelable: true });
+  };
+
+  const handleBlockReport = () => {
+    setMenuVisible(false);
+    if (onBlockReport && !isMine) {
+      onBlockReport({
+        id: from,
+        displayName: from,
+      });
+    }
+  };
 
   const handleReaction = (emoji: string) => {
     setMenuVisible(false);
@@ -98,19 +123,142 @@ export default function ChatMessageBubble({ isMine, text, timestamp, status, sho
 
   if (audioUrl) {
     return (
-      <TouchableWithoutFeedback onLongPress={handleLongPress}>
-        <View style={{ flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-end', marginBottom: 4 }}>
-          {!isMine && showAvatar ? (
-            <Image
-              source={getAvatarSource(user)}
-              style={{ width: 32, height: 32, borderRadius: 16, marginRight: 8 }}
-            />
-          ) : (
-            <View style={{ width: 32, height: 32, marginRight: 8 }} />
-          )}
-          <VoiceMessageBubble isMine={isMine} url={audioUrl} duration={audioDuration} />
-        </View>
-      </TouchableWithoutFeedback>
+      <>
+        <TouchableWithoutFeedback onLongPress={handleLongPress} onPress={isSelectionMode ? () => onSelect && onSelect() : undefined}>
+          <View style={{ 
+            flexDirection: isMine ? 'row-reverse' : 'row', 
+            alignItems: 'flex-end', 
+            marginBottom: 4,
+            opacity: isSelectionMode && !isSelected ? 0.6 : 1,
+          }}>
+            {/* Selection indicator */}
+            {isSelectionMode && (
+              <View style={{
+                width: 24,
+                height: 24,
+                borderRadius: 12,
+                borderWidth: 2,
+                borderColor: isSelected ? '#A259FF' : '#666',
+                backgroundColor: isSelected ? '#A259FF' : 'transparent',
+                justifyContent: 'center',
+                alignItems: 'center',
+                marginRight: isMine ? 0 : 8,
+                marginLeft: isMine ? 8 : 0,
+              }}>
+                {isSelected && (
+                  <FontAwesome5 name="check" size={12} color="#fff" />
+                )}
+              </View>
+            )}
+            {!isMine && showAvatar ? (
+              <Image
+                source={getAvatarSource(user)}
+                style={{ width: 32, height: 32, borderRadius: 16, marginRight: 8 }}
+              />
+            ) : (
+              <View style={{ width: 32, height: 32, marginRight: 8 }} />
+            )}
+            <View style={{
+              borderWidth: isSelected ? 2 : 0,
+              borderColor: '#A259FF',
+            }}>
+              <VoiceMessageBubble isMine={isMine} url={audioUrl} duration={audioDuration} />
+              {/* Message metadata row for audio messages */}
+              <View style={{ 
+                flexDirection: 'row', 
+                alignItems: 'center', 
+                justifyContent: isMine ? 'flex-end' : 'flex-start',
+                paddingHorizontal: 18, 
+                paddingBottom: 8,
+                gap: 6
+              }}>
+                {/* Show edited indicator */}
+                {edited && (
+                  <ThemedText style={{ color: '#A259FF', fontSize: 11, fontStyle: 'italic' }}>
+                    edited
+                  </ThemedText>
+                )}
+                {/* Timestamp */}
+                <ThemedText style={{ color: '#B7B3D7', fontSize: 11, opacity: 0.7 }}>
+                  {formatTime(timestamp)}
+                </ThemedText>
+                {/* Read status for my messages */}
+                {isMine && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    {status === 'sent' && (
+                      <FontAwesome5 name="check" size={10} color="#B7B3D7" />
+                    )}
+                    {status === 'delivered' && (
+                      <View style={{ flexDirection: 'row', gap: 1 }}>
+                        <FontAwesome5 name="check" size={10} color="#B7B3D7" />
+                        <FontAwesome5 name="check" size={10} color="#B7B3D7" style={{ marginLeft: -4 }} />
+                      </View>
+                    )}
+                    {status === 'read' && (
+                      <View style={{ flexDirection: 'row', gap: 1 }}>
+                        <FontAwesome5 name="check" size={10} color="#4CAF50" />
+                        <FontAwesome5 name="check" size={10} color="#4CAF50" style={{ marginLeft: -4 }} />
+                      </View>
+                    )}
+                  </View>
+                )}
+              </View>
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+        <Modal
+          visible={menuVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={handleCloseMenu}
+        >
+          <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.25)' }} activeOpacity={1} onPress={handleCloseMenu} />
+          <View style={{
+            position: 'absolute',
+            left: menuX !== null ? Math.max(16, Math.min(menuX - 120, windowWidth - 256)) : 32,
+            top: menuY !== null ? Math.max(32, Math.min(menuY, windowHeight - 320)) : '38%',
+            width: 240,
+            borderRadius: 22,
+            overflow: 'hidden',
+            alignItems: 'center',
+            elevation: 12
+          }}>
+            <BlurView intensity={40} tint="dark" style={{ width: '100%', padding: 0, borderRadius: 22 }}>
+              <View style={{ paddingVertical: 18, paddingHorizontal: 0, alignItems: 'center', width: 240 }}>
+                {/* Reaction emoji bar */}
+                <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ width: 240, alignSelf: 'center', marginBottom: 16, marginTop: 2, overflow: 'visible' }} contentContainerStyle={{ paddingHorizontal: 8 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    {emojiReactions.map((emoji, idx) => (
+                      <TouchableOpacity
+                        key={emoji + '-' + idx}
+                        onPress={() => handleReaction(emoji)}
+                        style={{
+                          marginHorizontal: 4,
+                          padding: 4,
+                          borderRadius: 8,
+                          backgroundColor: selectedReaction === emoji ? 'rgba(162,89,255,0.18)' : 'transparent',
+                          borderWidth: selectedReaction === emoji ? 1 : 0,
+                          borderColor: selectedReaction === emoji ? '#A259FF' : 'transparent',
+                        }}
+                      >
+                        <ThemedText style={{ fontSize: 24 }}>{emoji}</ThemedText>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </ScrollView>
+                {/* Reaction/drag bar */}
+                <View style={{ width: 56, height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.35)', marginBottom: 6, marginTop: 2, shadowColor: '#fff', shadowOpacity: 0.18, shadowRadius: 4 }} />
+
+                <MenuOption icon={<Feather name="trash-2" size={20} color="#FF5A5A" />} label="Delete" onPress={handleDelete} />
+                <MenuDivider />
+                <MenuOption icon={<Feather name="check-square" size={20} color="#6B47DC" />} label="Select" onPress={handleSelect} />
+                <MenuDivider />
+                <MenuOption icon={<Feather name="copy" size={20} color="#fff" />} label="Copy" onPress={handleCopy} />
+              </View>
+            </BlurView>
+          </View>
+        </Modal>
+      </>
     );
   }
 
@@ -120,10 +268,39 @@ export default function ChatMessageBubble({ isMine, text, timestamp, status, sho
     reactionCounts[emoji] = (reactionCounts[emoji] || 0) + 1;
   });
 
+
+
   return (
     <>
-      <TouchableWithoutFeedback onLongPress={handleLongPress}>
-        <View ref={bubbleRef} style={{ flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-end', marginBottom: 4 }}>
+      <TouchableWithoutFeedback onLongPress={handleLongPress} onPress={isSelectionMode ? () => onSelect && onSelect() : undefined}>
+        <View ref={bubbleRef} style={{ 
+          flexDirection: isMine ? 'row-reverse' : 'row', 
+          alignItems: 'flex-end', 
+          marginBottom: 4, 
+          alignSelf: isMine ? 'flex-end' : 'flex-start', 
+          width: 'auto', 
+          maxWidth: '100%',
+          opacity: isSelectionMode && !isSelected ? 0.6 : 1,
+        }}>
+          {/* Selection indicator */}
+          {isSelectionMode && (
+            <View style={{
+              width: 24,
+              height: 24,
+              borderRadius: 12,
+              borderWidth: 2,
+              borderColor: isSelected ? '#A259FF' : '#666',
+              backgroundColor: isSelected ? '#A259FF' : 'transparent',
+              justifyContent: 'center',
+              alignItems: 'center',
+              marginRight: isMine ? 0 : 8,
+              marginLeft: isMine ? 8 : 0,
+            }}>
+              {isSelected && (
+                <FontAwesome5 name="check" size={12} color="#fff" />
+              )}
+            </View>
+          )}
           {!isMine && showAvatar ? (
             <Image
               source={getAvatarSource(user)}
@@ -132,76 +309,73 @@ export default function ChatMessageBubble({ isMine, text, timestamp, status, sho
           ) : (
             <View style={{ width: 32, height: 32, marginRight: 8 }} />
           )}
-          {isMine ? (
-            <LinearGradient
-              colors={["#6E33BD", "#AD60EB"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1.75, y: 0 }}
+          <View style={{
+            flexShrink: 1,
+            maxWidth: 320,
+            minWidth: 0,
+            borderRadius: 24,
+            backgroundColor: isMine ? '#2D3A2E' : '#233A3A',
+            overflow: 'hidden',
+            alignSelf: isMine ? 'flex-end' : 'flex-start',
+            marginBottom: 4,
+            borderWidth: isSelected ? 2 : 0,
+            borderColor: '#A259FF',
+          }}>
+            <ThemedText
               style={{
-                alignSelf: 'flex-end',
-                borderRadius: 24,
-                borderTopRightRadius: 4,
-                borderBottomLeftRadius: 24,
-                paddingVertical: 12,
-                paddingHorizontal: 24,
-                maxWidth: '75%',
-                shadowColor: '#000',
-                shadowOpacity: 0.08,
-                shadowRadius: 4,
-                elevation: 2,
+                color: '#fff',
+                fontFamily: 'Sora-SemiBold',
+                fontSize: 15,
+                minWidth: 0,
+                marginTop: 0,
+                paddingHorizontal: 18,
+                paddingTop: 12,
+                paddingBottom: 12,
               }}
             >
-              <ThemedText
-                style={{
-                  color: '#fff',
-                  fontFamily: 'Sora-SemiBold',
-                  fontSize: 15,
-                  minWidth: 0,
-                }}
-              >
-                {text}
-              </ThemedText>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginTop: 6 }}>
-                <ThemedText style={{ color: '#fff', fontSize: 11, opacity: 0.7, marginRight: 4 }}>
-                  {formatTime(timestamp)}
+              {text}
+            </ThemedText>
+            {/* Message metadata row */}
+            <View style={{ 
+              flexDirection: 'row', 
+              alignItems: 'center', 
+              justifyContent: isMine ? 'flex-end' : 'flex-start',
+              paddingHorizontal: 18, 
+              paddingBottom: 8,
+              gap: 6
+            }}>
+              {/* Show edited indicator */}
+              {edited && (
+                <ThemedText style={{ color: '#A259FF', fontSize: 11, fontStyle: 'italic' }}>
+                  edited
                 </ThemedText>
-                {status === 'read' ? (
-                  <FontAwesome5 name="check-double" size={14} color="#fff" style={{ opacity: 0.7 }} />
-                ) : (
-                  <FontAwesome5 name="check" size={14} color="#fff" style={{ opacity: 0.7 }} />
-                )}
-              </View>
-            </LinearGradient>
-          ) : (
-            <View
-              style={{
-                alignSelf: 'flex-start',
-                backgroundColor: '#3D3C5B',
-                borderRadius: 24,
-                borderBottomRightRadius: 24,
-                borderTopLeftRadius: 4,
-                paddingVertical: 12,
-                paddingHorizontal: 24,
-                maxWidth: '75%',
-              }}
-            >
-              <ThemedText
-                style={{
-                  color: '#fff',
-                  fontFamily: 'Sora-SemiBold',
-                  fontSize: 15,
-                  minWidth: 0,
-                }}
-              >
-                {text}
+              )}
+              {/* Timestamp */}
+              <ThemedText style={{ color: '#B7B3D7', fontSize: 11, opacity: 0.7 }}>
+                {formatTime(timestamp)}
               </ThemedText>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', marginTop: 6 }}>
-                <ThemedText style={{ color: '#fff', fontSize: 11, opacity: 0.7 }}>
-                  {formatTime(timestamp)}
-                </ThemedText>
-              </View>
+              {/* Read status for my messages */}
+              {isMine && (
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  {status === 'sent' && (
+                    <FontAwesome5 name="check" size={10} color="#B7B3D7" />
+                  )}
+                  {status === 'delivered' && (
+                    <View style={{ flexDirection: 'row', gap: 1 }}>
+                      <FontAwesome5 name="check" size={10} color="#B7B3D7" />
+                      <FontAwesome5 name="check" size={10} color="#B7B3D7" style={{ marginLeft: -4 }} />
+                    </View>
+                  )}
+                  {status === 'read' && (
+                    <View style={{ flexDirection: 'row', gap: 1 }}>
+                      <FontAwesome5 name="check" size={10} color="#4CAF50" />
+                      <FontAwesome5 name="check" size={10} color="#4CAF50" style={{ marginLeft: -4 }} />
+                    </View>
+                  )}
+                </View>
+              )}
             </View>
-          )}
+          </View>
         </View>
       </TouchableWithoutFeedback>
       {/* Show reactions below the bubble */}
@@ -264,14 +438,14 @@ export default function ChatMessageBubble({ isMine, text, timestamp, status, sho
               </ScrollView>
               {/* Reaction/drag bar */}
               <View style={{ width: 56, height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.35)', marginBottom: 6, marginTop: 2, shadowColor: '#fff', shadowOpacity: 0.18, shadowRadius: 4 }} />
-              <MenuOption icon={<Feather name="corner-up-left" size={20} color="#A259FF" />} label="Reply" onPress={handleReply} />
-              <MenuDivider />
+
               <MenuOption icon={<Feather name="trash-2" size={20} color="#FF5A5A" />} label="Delete" onPress={handleDelete} />
               {isMine && <><MenuDivider /><MenuOption icon={<Feather name="edit-2" size={20} color="#FFD700" />} label="Edit" onPress={handleEdit} /></>}
               <MenuDivider />
               <MenuOption icon={<Feather name="check-square" size={20} color="#6B47DC" />} label="Select" onPress={handleSelect} />
               <MenuDivider />
               <MenuOption icon={<Feather name="copy" size={20} color="#fff" />} label="Copy" onPress={handleCopy} />
+              {!isMine && <><MenuDivider /><MenuOption icon={<Feather name="flag" size={20} color="#FF9800" />} label="Block/Report" onPress={handleBlockReport} /></>}
             </View>
           </BlurView>
         </View>

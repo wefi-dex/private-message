@@ -9,6 +9,7 @@ interface User {
   photo?: string;
   avatar?: string | null; // Now a string URL or null
   alias?: string;
+  role?: 'creator' | 'fan';
 }
 
 interface AuthContextProps {

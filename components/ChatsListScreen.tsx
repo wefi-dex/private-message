@@ -5,24 +5,31 @@ import { formatMessageTime, getChatId } from '@/utils/chatUtils';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { limitToLast, off, onValue, orderByChild, query, ref } from 'firebase/database';
+import { limitToLast, off, onValue, orderByChild, query, ref, serverTimestamp, set, onDisconnect } from 'firebase/database';
 import React, { useState, useEffect, memo } from 'react';
 import { Dimensions, FlatList, Image, Pressable, TextInput, TouchableOpacity, View, StyleSheet, Platform } from 'react-native';
 import { PanGestureHandler } from 'react-native-gesture-handler';
 import Animated, { useAnimatedGestureHandler, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
-import { getUsers } from '@/utils/api';
+import { getConnectedUsers } from '@/utils/api';
+import BlockReportModal from './BlockReportModal';
 
 const defaultProfileImage = require('@/assets/images/default-contact-2.png');
 
 // --- Components ---
 
-const ChatListItem = memo(function ChatListItem({ item, lastMsg, onPress }: any) {
+const ChatListItem = memo(function ChatListItem({ item, lastMsg, onPress, userStatus, unreadCount, onBlockReport }: any) {
   const displayName = item.displayName;
   const lastMessageTime = lastMsg ? formatMessageTime(lastMsg.timestamp) : '';
-  const unreadCount = 0;
+  const isOnline = userStatus?.state === 'online';
+  
+  const handleLongPress = () => {
+    onBlockReport?.(item);
+  };
+  
   return (
     <Pressable
       onPress={onPress}
+      onLongPress={handleLongPress}
       style={({ pressed }) => [
         styles.chatItem,
         pressed && styles.chatItemPressed,
@@ -37,17 +44,21 @@ const ChatListItem = memo(function ChatListItem({ item, lastMsg, onPress }: any)
             />
           </View>
         </View>
-        <View style={styles.statusDot} />
+        <View style={[styles.statusDot, isOnline ? styles.onlineDot : styles.offlineDot]} />
       </View>
       <View style={styles.chatContent}>
-        <ThemedText type="title" style={styles.chatName}>{displayName}</ThemedText>
-        <ThemedText style={styles.chatMsg}>{lastMsg ? (lastMsg.from === item.id ? `You: ${lastMsg.text}` : lastMsg.text) : ''}</ThemedText>
+        <ThemedText type="title" style={[styles.chatName, unreadCount > 0 && styles.unreadChatName]}>{displayName}</ThemedText>
+        <ThemedText style={[styles.chatMsg, unreadCount > 0 && styles.unreadChatMsg]}>
+          {lastMsg ? (lastMsg.from === item.id ? `You: ${lastMsg.text}` : lastMsg.text) : ''}
+        </ThemedText>
       </View>
       <View style={styles.chatMeta}>
-        <ThemedText style={styles.chatTime}>{lastMessageTime}</ThemedText>
+        <ThemedText style={[styles.chatTime, unreadCount > 0 && styles.unreadChatTime]}>{lastMessageTime}</ThemedText>
         {unreadCount > 0 && (
           <View style={styles.unreadBadge}>
-            <ThemedText style={styles.unreadText}>{unreadCount}</ThemedText>
+            <ThemedText style={styles.unreadText}>
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </ThemedText>
           </View>
         )}
       </View>
@@ -56,7 +67,7 @@ const ChatListItem = memo(function ChatListItem({ item, lastMsg, onPress }: any)
 });
 ChatListItem.displayName = 'ChatListItem';
 
-const StoriesRow = memo(function StoriesRow({ user, chats, navigation }: any) {
+const StoriesRow = memo(function StoriesRow({ user, chats, navigation, userStatuses }: any) {
   return (
     <View style={styles.storiesRow}>
       <FlatList
@@ -65,33 +76,39 @@ const StoriesRow = memo(function StoriesRow({ user, chats, navigation }: any) {
         showsHorizontalScrollIndicator={false}
         keyExtractor={item => item.id}
         contentContainerStyle={styles.storiesList}
-        renderItem={({ item }) => (
-          <View style={styles.storyItem}>
-            <TouchableOpacity
-              onPress={() => {
-                if (item.id === 'my' || (item as any).isMe) {
-                  navigation.getParent()?.navigate('Phone');
-                } else {
-                  navigation.navigate('ChatRoom', { userId: item.id, userName: item.displayName });
-                }
-              }}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.storyAvatarWrap, { borderColor: (item as any).isMe || item.id === 'my' ? '#A259FF' : '#F357A8' }] }>
-                <Image
-                  source={item.avatar ? { uri: item.avatar } : defaultProfileImage}
-                  style={styles.storyAvatar}
-                />
-                {'isMe' in item && item.isMe || item.id === 'my' ? (
-                  <View style={styles.storyAddBtn}>
-                    <Feather name="plus" size={12} color="#fff" />
-                  </View>
-                ) : null}
-              </View>
-            </TouchableOpacity>
-            <ThemedText style={styles.storyName}>{item.displayName.split(' ')[0]}</ThemedText>
-          </View>
-        )}
+        renderItem={({ item }) => {
+          const isOnline = item.id !== 'my' && userStatuses[item.id]?.state === 'online';
+          return (
+            <View style={styles.storyItem}>
+              <TouchableOpacity
+                onPress={() => {
+                  if (item.id === 'my' || (item as any).isMe) {
+                    navigation.getParent()?.navigate('Phone');
+                  } else {
+                    navigation.navigate('ChatRoom', { userId: item.id, userName: item.displayName });
+                  }
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.storyAvatarWrap, { borderColor: (item as any).isMe || item.id === 'my' ? '#A259FF' : '#F357A8' }] }>
+                  <Image
+                    source={item.avatar ? { uri: item.avatar } : defaultProfileImage}
+                    style={styles.storyAvatar}
+                  />
+                  {'isMe' in item && item.isMe || item.id === 'my' ? (
+                    <View style={styles.storyAddBtn}>
+                      <Feather name="plus" size={12} color="#fff" />
+                    </View>
+                  ) : null}
+                  {item.id !== 'my' && (
+                    <View style={[styles.storyStatusDot, isOnline ? styles.onlineDot : styles.offlineDot]} />
+                  )}
+                </View>
+              </TouchableOpacity>
+              <ThemedText style={styles.storyName}>{item.displayName.split(' ')[0]}</ThemedText>
+            </View>
+          );
+        }}
       />
     </View>
   );
@@ -141,26 +158,54 @@ export default function ChatsListScreen() {
   const { user, logout, token } = useAuth();
   const navigation = useNavigation<StackNavigationProp<ChatStackParamList, 'ChatsList'>>();
   const [lastMessages, setLastMessages] = useState<{ [userId: string]: { text: string; timestamp: number; from?: string } | null }>({});
+  const [userStatuses, setUserStatuses] = useState<{ [userId: string]: { state: string; last_changed: number } | null }>({});
+  const [unreadCounts, setUnreadCounts] = useState<{ [userId: string]: number }>({});
   const [profileMenuVisible, setProfileMenuVisible] = useState(false);
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [chats, setChats] = useState<ChatItem[]>([]);
+  const [blockReportModalVisible, setBlockReportModalVisible] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<any>(null);
 
-  // Fetch users from backend
+  // Fetch connected users from backend
   useEffect(() => {
-    if (!user) return;
-    getUsers(token || undefined)
+    if (!user?.id || !token) return;
+    getConnectedUsers(user.id, token)
       .then(users => {
-        // Only filter out current user if user.id is defined and matches
-        const filtered = users.filter((u: any) => !user.id || u.id !== user.id);
-        // Debug: log the user list
-        setChats(filtered.map((u: any) => ({
+        setChats(users.map((u: any) => ({
           ...u,
           displayName: u.alias || u.username || '',
         })));
       })
-      .catch(e => console.log(e.message || 'Failed to load users'));
+      .catch(e => console.log(e.message || 'Failed to load connected users'));
   }, [user, token]);
+
+  // Set current user's presence
+  useEffect(() => {
+    if (!user?.id) return;
+    const userStatusRef = ref(db, `status/${user.id}`);
+    set(userStatusRef, { state: 'online', last_changed: serverTimestamp() });
+    onDisconnect(userStatusRef).set({ state: 'offline', last_changed: serverTimestamp() });
+    return () => {
+      set(userStatusRef, { state: 'offline', last_changed: serverTimestamp() });
+    };
+  }, [user?.id]);
+
+  // Listen for other users' presence
+  useEffect(() => {
+    if (!user?.id) return;
+    const listeners: (() => void)[] = [];
+    
+    chats.forEach((chatUser) => {
+      const statusRef = ref(db, `status/${chatUser.id}`);
+      const handle = onValue(statusRef, (snapshot) => {
+        setUserStatuses(prev => ({ ...prev, [chatUser.id]: snapshot.val() }));
+      });
+      listeners.push(() => off(statusRef, 'value', handle));
+    });
+    
+    return () => { listeners.forEach(unsub => unsub()); };
+  }, [chats, user?.id]);
 
   // Filter chats by searchText
   const filteredChats = searchText.trim()
@@ -178,7 +223,7 @@ export default function ChatsListScreen() {
         const data = snapshot.val();
         if (data) {
           const lastMsg = Object.values(data)[0] as any;
-          setLastMessages(prev => ({ ...prev, [chatUser.id]: { text: lastMsg.text, timestamp: lastMsg.timestamp } }));
+          setLastMessages(prev => ({ ...prev, [chatUser.id]: { text: lastMsg.text, timestamp: lastMsg.timestamp, from: lastMsg.from } }));
         } else {
           setLastMessages(prev => ({ ...prev, [chatUser.id]: null }));
         }
@@ -188,9 +233,53 @@ export default function ChatsListScreen() {
     return () => { listeners.forEach(unsub => unsub()); };
   }, [chats, user]);
 
+  // Listen for unread messages count
+  useEffect(() => {
+    if (!user) return;
+    const listeners: (() => void)[] = [];
+    chats.forEach((chatUser) => {
+      const chatId = getChatId(user.id, chatUser.id);
+      const messagesRef = ref(db, `chats/${chatId}/messages`);
+      const handle = onValue(messagesRef, (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+          // Count messages that are addressed to current user and not read
+          const unreadCount = Object.values(data).filter((msg: any) => 
+            msg.to === user.id && msg.status !== 'read'
+          ).length;
+          setUnreadCounts(prev => ({ ...prev, [chatUser.id]: unreadCount }));
+        } else {
+          setUnreadCounts(prev => ({ ...prev, [chatUser.id]: 0 }));
+        }
+      });
+      listeners.push(() => off(messagesRef, 'value', handle));
+    });
+    return () => { listeners.forEach(unsub => unsub()); };
+  }, [chats, user]);
+
   const { height: SCREEN_HEIGHT } = Dimensions.get('window');
   const SNAP_TOP = 80;
   const SNAP_BOTTOM = SCREEN_HEIGHT * 0.38;
+
+  // Clear unread count when navigating to a chat
+  const handleChatPress = (userId: string, userName: string) => {
+    // Clear unread count for this chat
+    setUnreadCounts(prev => ({ ...prev, [userId]: 0 }));
+    navigation.navigate('ChatRoom', { userId, userName });
+  };
+
+  // Handle block/report actions
+  const handleBlockReport = (user: any) => {
+    setSelectedUser(user);
+    setBlockReportModalVisible(true);
+  };
+
+  const handleBlockStatusChange = (isBlocked: boolean) => {
+    if (isBlocked && selectedUser) {
+      // Remove user from chat list when blocked
+      setChats(prev => prev.filter(chat => chat.id !== selectedUser.id));
+    }
+  };
 
   // Draggable chat list container
   const translateY = useSharedValue(SNAP_BOTTOM);
@@ -237,7 +326,16 @@ export default function ChatsListScreen() {
             />
           </View>
         ) : (
-          <ThemedText type="title" style={styles.headerTitle}>Home</ThemedText>
+          <View style={styles.headerTitleContainer}>
+            <ThemedText type="title" style={styles.headerTitle}>Home</ThemedText>
+            {Object.values(unreadCounts).reduce((sum, count) => sum + count, 0) > 0 && (
+              <View style={styles.totalUnreadBadge}>
+                <ThemedText style={styles.totalUnreadText}>
+                  {Object.values(unreadCounts).reduce((sum, count) => sum + count, 0) > 99 ? '99+' : Object.values(unreadCounts).reduce((sum, count) => sum + count, 0)}
+                </ThemedText>
+              </View>
+            )}
+          </View>
         )}
         <View style={{ position: 'relative' }}>
           <TouchableOpacity onPress={() => setProfileMenuVisible(true)}>
@@ -251,7 +349,7 @@ export default function ChatsListScreen() {
         </View>
       </View>
       {/* Stories Row */}
-      <StoriesRow user={user} chats={chats} navigation={navigation} />
+      <StoriesRow user={user} chats={chats} navigation={navigation} userStatuses={userStatuses} />
       {/* Draggable Chat List */}
       <PanGestureHandler onGestureEvent={gestureHandler}>
         <Animated.View style={[styles.chatListContainer, { height: SCREEN_HEIGHT }, animatedStyle]}>
@@ -264,9 +362,23 @@ export default function ChatsListScreen() {
               <ChatListItem
                 item={item}
                 lastMsg={lastMessages[item.id]}
-                onPress={() => navigation.navigate('ChatRoom', { userId: item.id, userName: item.displayName })}
+                userStatus={userStatuses[item.id]}
+                unreadCount={unreadCounts[item.id] || 0}
+                onPress={() => handleChatPress(item.id, item.displayName)}
+                onBlockReport={handleBlockReport}
               />
             )}
+            ListEmptyComponent={
+              <View style={styles.emptyState}>
+                <Feather name="users" size={64} color="#666" />
+                <ThemedText style={styles.emptyStateText}>
+                  No connected users
+                </ThemedText>
+                <ThemedText style={styles.emptyStateSubtext}>
+                  Connect with creators to start chatting
+                </ThemedText>
+              </View>
+            }
           />
         </Animated.View>
       </PanGestureHandler>
@@ -281,6 +393,14 @@ export default function ChatsListScreen() {
           setProfileMenuVisible(false);
           logout();
         }}
+      />
+      
+      {/* Block/Report Modal */}
+      <BlockReportModal
+        visible={blockReportModalVisible}
+        onClose={() => setBlockReportModalVisible(false)}
+        targetUser={selectedUser}
+        onBlockStatusChange={handleBlockStatusChange}
       />
     </View>
   );
@@ -307,6 +427,25 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: 'bold',
     letterSpacing: 0.5,
+  },
+  headerTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  totalUnreadBadge: {
+    backgroundColor: '#F357A8',
+    borderRadius: 9999,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    marginLeft: 8,
+  },
+  totalUnreadText: {
+    color: '#fff',
+    fontSize: 11,
+    fontFamily: 'Sora-Bold',
   },
   searchBoxWrap: {
     flex: 1,
@@ -403,6 +542,17 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#23213A',
   },
+  storyStatusDot: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#95999C',
+    borderWidth: 2,
+    borderColor: '#23213A',
+  },
   storyName: {
     color: '#fff',
     fontSize: 12,
@@ -427,10 +577,12 @@ const styles = StyleSheet.create({
   },
   chatListHandle: {
     alignItems: 'center',
-    marginBottom: 8,
-    width: '100%',
-    height: 16,
+    margin: 'auto',
+    width: '15%',
+    height: 4,
+    borderRadius: 4,
     justifyContent: 'center',
+    backgroundColor: '#E0E0E0',
   },
   chatList: {
     padding: 10,
@@ -497,6 +649,12 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: '#95999C',
   },
+  onlineDot: {
+    backgroundColor: '#4CAF50',
+  },
+  offlineDot: {
+    backgroundColor: '#95999C',
+  },
   chatContent: {
     flex: 1,
     justifyContent: 'flex-end',
@@ -509,6 +667,9 @@ const styles = StyleSheet.create({
     padding: 0,
     lineHeight: 18,
   },
+  unreadChatName: {
+    fontWeight: '900',
+  },
   chatMsg: {
     color: '#B7B3D7',
     opacity: 0.9,
@@ -517,6 +678,11 @@ const styles = StyleSheet.create({
     marginTop: 0,
     padding: 0,
     lineHeight: 15,
+  },
+  unreadChatMsg: {
+    fontFamily: 'Sora-Bold',
+    color: '#fff',
+    opacity: 1,
   },
   chatMeta: {
     alignItems: 'flex-end',
@@ -528,6 +694,11 @@ const styles = StyleSheet.create({
     opacity: 0.7,
     fontSize: 11,
     marginBottom: 4,
+  },
+  unreadChatTime: {
+    color: '#F357A8',
+    opacity: 1,
+    fontWeight: 'bold',
   },
   unreadBadge: {
     backgroundColor: '#F357A8',
@@ -605,5 +776,25 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     letterSpacing: 0.2,
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+    marginTop: 100,
+  },
+  emptyStateText: {
+    fontSize: 20,
+    color: '#fff',
+    marginTop: 16,
+    fontWeight: 'bold',
+  },
+  emptyStateSubtext: {
+    fontSize: 14,
+    color: '#aaa',
+    marginTop: 8,
+    textAlign: 'center',
+    lineHeight: 20,
   },
 }); 

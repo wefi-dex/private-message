@@ -12,7 +12,7 @@ function SettingsScreen() {
   const toggleTheme = () => setTheme(isDark ? 'light' : 'dark');
   return (
     <ThemedView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-      <ThemedText type="title">Settings Page</ThemedText>
+      <ThemedText type="title">Safety & Privacy Tools</ThemedText>
       <ThemedText style={{ marginTop: 24, marginBottom: 8 }}>Dark Mode</ThemedText>
       <Switch value={isDark} onValueChange={toggleTheme} />
     </ThemedView>

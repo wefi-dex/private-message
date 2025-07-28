@@ -6,10 +6,11 @@ import ProfileStackScreen from '@/components/ProfileScreen';
 import SettingsStackScreen from '@/components/SettingsScreen';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { AntDesign, FontAwesome5, Ionicons, SimpleLineIcons } from '@expo/vector-icons';
+import { FontAwesome5, Ionicons, SimpleLineIcons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import * as React from 'react';
 import { Animated } from 'react-native';
+import AntDesign from '@expo/vector-icons/AntDesign';
 
 // Add QRCode import (mock with a View if not installed)
 let QRCode: any = undefined;
@@ -81,10 +82,12 @@ export default function App() {
             return <Ionicons name="chatbubble-outline" size={16} color={iconColor} />;
           }
           if (route.name === 'Phone') {
-            return <SimpleLineIcons name="phone" size={16} color={iconColor} />;
+            return <FontAwesome5 name="user-circle" size={16} color={iconColor} />;
+
           }
           if (route.name === 'Contact') {
-            return <FontAwesome5 name="user-circle" size={16} color={iconColor} />;
+            // return <SimpleLineIcons name="phone" size={16} color={iconColor} />;
+            return <AntDesign name="swap" size={16} color={iconColor} />
           }
           if (route.name === 'Settings') {
             return <AntDesign name="setting" size={16} color={iconColor} />;

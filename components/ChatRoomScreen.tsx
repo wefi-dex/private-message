@@ -9,10 +9,11 @@ import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import { useNavigation } from '@react-navigation/native';
 import { get, off, onDisconnect, onValue, orderByChild, push, query, ref, remove, serverTimestamp, set, update } from 'firebase/database';
 import React from 'react';
-import { FlatList, Image, KeyboardAvoidingView, Platform, TouchableOpacity, View } from 'react-native';
+import { Alert, Clipboard, FlatList, Image, KeyboardAvoidingView, Platform, TouchableOpacity, View } from 'react-native';
 import CallScreen from './CallScreen';
 import ChatInputBar from './ChatInputBar';
 import ChatMessageBubble from './ChatMessageBubble';
+import BlockReportModal from './BlockReportModal';
 
 export default function ChatRoomScreen(props: any) {
   const { user } = useAuth();
@@ -32,6 +33,12 @@ export default function ChatRoomScreen(props: any) {
   const [newMessageCount, setNewMessageCount] = React.useState(0);
   const flatListRef = React.useRef<FlatList>(null);
   const isAtBottomRef = React.useRef(true);
+  const [editingMessage, setEditingMessage] = React.useState<any>(null);
+  const [selectedMessages, setSelectedMessages] = React.useState<Set<string>>(new Set());
+  const [isSelectionMode, setIsSelectionMode] = React.useState(false);
+  const [blockReportModalVisible, setBlockReportModalVisible] = React.useState(false);
+  const [selectedUser, setSelectedUser] = React.useState<any>(null);
+
 
   // All useEffect and useCallback hooks must also be before any early return
   React.useEffect(() => {
@@ -129,18 +136,134 @@ export default function ChatRoomScreen(props: any) {
     });
   }, [chatId, user?.id]);
 
+
+
   const sendMessage = () => {
     if (input.trim()) {
-      const messagesRef = ref(db, `chats/${chatId}/messages`);
-      push(messagesRef, {
-        text: input,
-        from: user?.id,
-        to: userId,
-        timestamp: Date.now(),
-        status: 'sent',
-      });
+      if (editingMessage) {
+        // Update existing message
+        const messageRef = ref(db, `chats/${chatId}/messages/${editingMessage.id}`);
+        update(messageRef, {
+          text: input,
+          edited: true,
+          editedAt: Date.now(),
+        });
+        setEditingMessage(null);
+      } else {
+        // Send new message
+        const messagesRef = ref(db, `chats/${chatId}/messages`);
+        push(messagesRef, {
+          text: input,
+          from: user?.id,
+          to: userId,
+          timestamp: Date.now(),
+          status: 'sent',
+        });
+      }
       setInput('');
       setTypingStatus(false);
+    }
+  };
+
+  const handleEditMessage = (message: any) => {
+    setEditingMessage(message);
+    setInput(message.text);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMessage(null);
+    setInput('');
+  };
+
+  const handleDeleteMessage = (message: any) => {
+    Alert.alert(
+      'Delete Message',
+      'Are you sure you want to delete this message?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            if (message.id) {
+              const messageRef = ref(db, `chats/${chatId}/messages/${message.id}`);
+              remove(messageRef);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleSelectMessage = (message: any) => {
+    // Cancel editing if in edit mode
+    if (editingMessage) {
+      setEditingMessage(null);
+      setInput('');
+    }
+    
+    if (isSelectionMode) {
+      setSelectedMessages(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(message.id)) {
+          newSet.delete(message.id);
+        } else {
+          newSet.add(message.id);
+        }
+        return newSet;
+      });
+    } else {
+      setIsSelectionMode(true);
+      setSelectedMessages(new Set([message.id]));
+    }
+  };
+
+  const handleBulkDelete = () => {
+    Alert.alert(
+      'Delete Messages',
+      `Are you sure you want to delete ${selectedMessages.size} message${selectedMessages.size !== 1 ? 's' : ''}?`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            selectedMessages.forEach(messageId => {
+              const messageRef = ref(db, `chats/${chatId}/messages/${messageId}`);
+              remove(messageRef);
+            });
+            setSelectedMessages(new Set());
+            setIsSelectionMode(false);
+          },
+        },
+      ]
+    );
+  };
+
+  const handleBulkCopy = () => {
+    const selectedMessageTexts = messages
+      .filter(msg => selectedMessages.has(msg.id))
+      .map(msg => msg.text || `Voice message (${msg.audioDuration}s)`)
+      .join('\n\n');
+    
+    Clipboard.setString(selectedMessageTexts);
+    Alert.alert('✓ Copied', `${selectedMessages.size} message${selectedMessages.size !== 1 ? 's' : ''} copied to clipboard`, [{ text: 'OK' }], { cancelable: true });
+    setSelectedMessages(new Set());
+    setIsSelectionMode(false);
+  };
+
+  const handleCancelSelection = () => {
+    setSelectedMessages(new Set());
+    setIsSelectionMode(false);
+    // If we were editing, restore the edit mode
+    if (editingMessage) {
+      setInput(editingMessage.text);
     }
   };
 
@@ -170,6 +293,17 @@ export default function ChatRoomScreen(props: any) {
       });
     });
   }, [chatId, user?.id]);
+
+  // Mark messages as read when entering the chat room
+  React.useEffect(() => {
+    if (chatId && user?.id) {
+      // Small delay to ensure the chat is fully loaded
+      const timer = setTimeout(() => {
+        markMessagesAsRead();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [chatId, user?.id, markMessagesAsRead]);
 
   const handleScroll = (event: any) => {
     const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
@@ -209,6 +343,7 @@ export default function ChatRoomScreen(props: any) {
     flatListRef.current?.scrollToEnd({ animated: true });
     setShowScrollToBottom(false);
     setNewMessageCount(0);
+    markMessagesAsRead();
   };
 
   function getDayLabel(date: Date) {
@@ -231,6 +366,8 @@ export default function ChatRoomScreen(props: any) {
   }
 
   const defaultProfileImage = require('@/assets/images/default-contact-2.png');
+
+
 
   if (!user) {
     return null;
@@ -273,8 +410,56 @@ export default function ChatRoomScreen(props: any) {
             <FontAwesome5 name="phone" size={20} color="#B7B3D7" style={{ marginHorizontal: 8 }} />
           </TouchableOpacity>
           <FontAwesome5 name="video" size={20} color="#B7B3D7" style={{ marginHorizontal: 8 }} />
+          <TouchableOpacity onPress={() => setBlockReportModalVisible(true)}>
+            <FontAwesome5 name="ellipsis-v" size={20} color="#B7B3D7" style={{ marginHorizontal: 8 }} />
+          </TouchableOpacity>
         </View>
       </View>
+      {/* Selection Mode Header */}
+      {isSelectionMode && (
+        <View style={{ 
+          flexDirection: 'row', 
+          alignItems: 'center', 
+          padding: 16, 
+          backgroundColor: '#2D2C5B', 
+          borderBottomWidth: 1, 
+          borderBottomColor: '#35345A' 
+        }}>
+          <TouchableOpacity onPress={handleCancelSelection} style={{ marginRight: 16 }}>
+            <FontAwesome5 name="times" size={20} color="#fff" />
+          </TouchableOpacity>
+                     <ThemedText style={{ color: '#fff', fontSize: 16, fontWeight: 'bold', flex: 1 }}>
+             {selectedMessages.size} message{selectedMessages.size !== 1 ? 's' : ''} selected
+           </ThemedText>
+           <TouchableOpacity 
+             onPress={handleBulkCopy} 
+             style={{ 
+               backgroundColor: '#6B47DC', 
+               paddingHorizontal: 16, 
+               paddingVertical: 8, 
+               borderRadius: 20,
+               marginRight: 8
+             }}
+           >
+             <ThemedText style={{ color: '#fff', fontSize: 14, fontWeight: 'bold' }}>
+               Copy
+             </ThemedText>
+           </TouchableOpacity>
+           <TouchableOpacity 
+             onPress={handleBulkDelete} 
+             style={{ 
+               backgroundColor: '#FF5A5A', 
+               paddingHorizontal: 16, 
+               paddingVertical: 8, 
+               borderRadius: 20 
+             }}
+           >
+             <ThemedText style={{ color: '#fff', fontSize: 14, fontWeight: 'bold' }}>
+               Delete
+             </ThemedText>
+           </TouchableOpacity>
+        </View>
+      )}
       <FlatList
         ref={flatListRef}
         data={messagesWithLabels.filter(item => item.type === 'message')}
@@ -293,6 +478,17 @@ export default function ChatRoomScreen(props: any) {
               chatId={chatId}
               userId={user.id}
               reactions={item.reactions || {}}
+              from={item.alias || item.username || item.from}
+              onEdit={() => handleEditMessage(item)}
+              edited={item.edited}
+              onDelete={() => handleDeleteMessage(item)}
+              onSelect={() => handleSelectMessage(item)}
+              isSelected={selectedMessages.has(item.id)}
+              isSelectionMode={isSelectionMode}
+              onBlockReport={(user) => {
+                setSelectedUser(user);
+                setBlockReportModalVisible(true);
+              }}
             />
           );
         }}
@@ -361,16 +557,36 @@ export default function ChatRoomScreen(props: any) {
           />
         </View>
       )}
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ borderTopColor: "#2D2C5B", borderTopWidth: 1 }}>
-        <ChatInputBar
-          input={input}
-          handleInputChange={handleInputChange}
-          handleInputFocus={handleInputFocus}
-          handleInputBlur={handleInputBlur}
-          sendMessage={sendMessage}
-          onInputHeightChange={setInputBoxHeight}
-        />
-      </KeyboardAvoidingView>
+      {!isSelectionMode && (
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ borderTopColor: "#2D2C5B", borderTopWidth: 1 }}>
+          <ChatInputBar
+            input={input}
+            handleInputChange={handleInputChange}
+            handleInputFocus={handleInputFocus}
+            handleInputBlur={handleInputBlur}
+            sendMessage={sendMessage}
+            onInputHeightChange={setInputBoxHeight}
+            editingMessage={editingMessage}
+            onCancelEdit={handleCancelEdit}
+          />
+        </KeyboardAvoidingView>
+      )}
+      
+      {/* Block/Report Modal */}
+      <BlockReportModal
+        visible={blockReportModalVisible}
+        onClose={() => setBlockReportModalVisible(false)}
+        targetUser={selectedUser || {
+          id: userId,
+          displayName: userName,
+        }}
+        onBlockStatusChange={(isBlocked) => {
+          if (isBlocked) {
+            // Navigate back to chat list when user is blocked
+            navigation.goBack();
+          }
+        }}
+      />
     </ThemedView>
   );
 } 
