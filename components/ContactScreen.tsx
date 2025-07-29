@@ -1,8 +1,8 @@
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { TextInput, TouchableOpacity, View, StyleSheet, Keyboard, Modal, Image, FlatList, RefreshControl } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { getUsers, createUserConnection, getUserConnectionStatus, getUserByUsername, getPendingConnectionRequests, respondToConnectionRequest, getConnectionHistory } from '@/utils/api';
@@ -71,6 +71,14 @@ function ConnectionRequestsManager() {
     
     return () => off(connectionRequestsRef, 'value', handle);
   }, [user?.id]);
+
+  // Reload data when tab is focused
+  useFocusEffect(
+    useCallback(() => {
+      if (!user?.id || !token) return;
+      loadData();
+    }, [user?.id, token])
+  );
 
   const handleRespondToRequest = async (connectionId: string, action: 'accept' | 'reject') => {
     if (!token) return;
@@ -259,6 +267,16 @@ function FindCreatorScreen() {
     
     return () => off(connectionRequestsRef, 'value', handle);
   }, [user?.id, searchResult]);
+
+  // Reload data when tab is focused
+  useFocusEffect(
+    useCallback(() => {
+      // Clear any existing search results when tab is focused
+      setSearchResult(null);
+      setError('');
+      setInviteCode('');
+    }, [])
+  );
 
   // Handle QR scan result
   const handleBarCodeScanned = async ({ data }: { data: string }) => {

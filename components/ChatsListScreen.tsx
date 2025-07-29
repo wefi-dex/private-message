@@ -3,10 +3,10 @@ import { ThemedText } from '@/components/ThemedText';
 import { db } from '@/constants/firebase';
 import { formatMessageTime, getChatId } from '@/utils/chatUtils';
 import { Feather } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { limitToLast, off, onValue, orderByChild, query, ref, serverTimestamp, set, onDisconnect } from 'firebase/database';
-import React, { useState, useEffect, memo } from 'react';
+import React, { useState, useEffect, memo, useCallback } from 'react';
 import { Dimensions, FlatList, Image, Pressable, TextInput, TouchableOpacity, View, StyleSheet, Platform } from 'react-native';
 import { PanGestureHandler } from 'react-native-gesture-handler';
 import Animated, { useAnimatedGestureHandler, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
@@ -256,6 +256,23 @@ export default function ChatsListScreen() {
     });
     return () => { listeners.forEach(unsub => unsub()); };
   }, [chats, user]);
+
+  // Reload data when tab is focused
+  useFocusEffect(
+    useCallback(() => {
+      if (!user?.id || !token) return;
+      
+      // Reload connected users
+      getConnectedUsers(user.id, token)
+        .then(users => {
+          setChats(users.map((u: any) => ({
+            ...u,
+            displayName: u.alias || u.username || '',
+          })));
+        })
+        .catch(e => console.log(e.message || 'Failed to load connected users'));
+    }, [user?.id, token])
+  );
 
   const { height: SCREEN_HEIGHT } = Dimensions.get('window');
   const SNAP_TOP = 80;

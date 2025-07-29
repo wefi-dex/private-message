@@ -1,20 +1,29 @@
 import { useThemeContext } from '@/components/ThemeContext';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import React from 'react';
+import React, { useCallback } from 'react';
 import { Switch } from 'react-native';
 
 function SettingsScreen() {
   const { theme, setTheme } = useThemeContext();
   const isDark = theme === 'dark';
   const toggleTheme = () => setTheme(isDark ? 'light' : 'dark');
+
+  // Reload data when tab is focused
+  useFocusEffect(
+    useCallback(() => {
+      // Settings screen doesn't have much data to reload, but we can add any future functionality here
+    }, [])
+  );
+
   return (
     <ThemedView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
       <ThemedText type="title">Safety & Privacy Tools</ThemedText>
-      <ThemedText style={{ marginTop: 24, marginBottom: 8 }}>Dark Mode</ThemedText>
-      <Switch value={isDark} onValueChange={toggleTheme} />
+      <ThemedText style={{ marginTop: 24, marginBottom: 8 }}>Protect Capture Screen</ThemedText>
+      {/* <ThemedText style={{ marginTop: 24, marginBottom: 8 }}>Dark Mode</ThemedText>
+      <Switch value={isDark} onValueChange={toggleTheme} /> */}
     </ThemedView>
   );
 }

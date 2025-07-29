@@ -309,18 +309,25 @@ export default function ChatMessageBubble({ isMine, text, timestamp, status, sho
           ) : (
             <View style={{ width: 32, height: 32, marginRight: 8 }} />
           )}
-          <View style={{
-            flexShrink: 1,
-            maxWidth: 320,
-            minWidth: 0,
-            borderRadius: 24,
-            backgroundColor: isMine ? '#2D3A2E' : '#233A3A',
-            overflow: 'hidden',
-            alignSelf: isMine ? 'flex-end' : 'flex-start',
-            marginBottom: 4,
-            borderWidth: isSelected ? 2 : 0,
-            borderColor: '#A259FF',
-          }}>
+          <LinearGradient
+            colors={isMine ? ["#7426D0", "#A960E0"] : ["#35345A", "#23213A"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1.75, y: 0 }}
+            style={{
+              flexShrink: 1,
+              maxWidth: 320,
+              minWidth: 0,
+              borderTopLeftRadius: isMine ? 24 : 0,
+              borderTopRightRadius: isMine ? 0 : 24,
+              borderBottomLeftRadius: 24,
+              borderBottomRightRadius: 24,
+              overflow: 'hidden',
+              alignSelf: isMine ? 'flex-end' : 'flex-start',
+              marginBottom: 4,
+              borderWidth: isSelected ? 2 : 0,
+              borderColor: '#A259FF',
+            }}
+          >
             <ThemedText
               style={{
                 color: '#fff',
@@ -375,7 +382,7 @@ export default function ChatMessageBubble({ isMine, text, timestamp, status, sho
                 </View>
               )}
             </View>
-          </View>
+          </LinearGradient>
         </View>
       </TouchableWithoutFeedback>
       {/* Show reactions below the bubble */}

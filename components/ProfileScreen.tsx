@@ -3,11 +3,11 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { Colors } from '@/constants/Colors';
 import { getFileUrl, getUser, updateUser, uploadFile, checkUsernameDuplicate } from '@/utils/api';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useCallback } from 'react';
 import { Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
@@ -71,6 +71,24 @@ function ProfileScreen(props: any) {
       setOriginalAlias(user.alias || '');
     }
   }, [user]);
+
+  // Reload user data when tab is focused
+  useFocusEffect(
+    useCallback(() => {
+      if (user) {
+        setUsername(user.username || '');
+        setBio(user.bio || '');
+        setPhoto(user.avatar || null);
+        setAlias(user.alias || '');
+        setOriginalUsername(user.username || '');
+        setOriginalBio(user.bio || '');
+        setOriginalAlias(user.alias || '');
+        setError('');
+        setSuccess('');
+        setUsernameError('');
+      }
+    }, [user])
+  );
 
   const handleUsernameChange = async (val: string) => {
     setUsername(val);

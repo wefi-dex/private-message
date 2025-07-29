@@ -49,7 +49,7 @@ export default function VoiceMessageBubble({ isMine, url, duration }: VoiceMessa
 
   return (
     <LinearGradient
-      colors={isMine ? ["#6E33BD", "#AD60EB"] : ["#35345A", "#23213A"]}
+      colors={isMine ? ["#7426D0", "#A960E0"] : ["#35345A", "#23213A"]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1.75, y: 0 }}
       style={styles.bubble}
