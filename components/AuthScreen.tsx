@@ -126,16 +126,16 @@ export default function AuthScreen() {
       <View style={styles.logoWrap}>
         <LogoSvg1 style={styles.logoSvg1} />
       </View>
-      <View style={[styles.formOuterWrap, !isLogin && { marginBottom: 52 }]}>
+      <View style={[styles.formOuterWrap]}>
         <BlurView intensity={90} tint="dark" style={styles.blurView}>
           <View style={styles.formWrap}>
             <ThemedText type="title" style={styles.title}>{isLogin ? 'Login' : 'Register'}</ThemedText>
-            <ThemedText style={styles.subtitle}>{isLogin ? 'Welcome back! Please login to your account.' : 'Create a new account to get started.'}</ThemedText>
+            <ThemedText style={styles.subtitle}>{isLogin ? 'Welcome back! Please login to your account.' : 'Create a new account.'}</ThemedText>
             <AuthInput
               icon="at-sign"
               value={username}
               onChangeText={setUsername}
-              placeholder="Username (required)"
+              placeholder="Username"
               style={{ marginBottom: 18 }}
             />
             {!isLogin && (
@@ -143,7 +143,7 @@ export default function AuthScreen() {
                 icon="user"
                 value={alias}
                 onChangeText={setAlias}
-                placeholder="Display name (required)"
+                placeholder="Display name"
                 style={{ marginBottom: 18 }}
               />
             )}
@@ -151,7 +151,7 @@ export default function AuthScreen() {
               icon="lock"
               value={password}
               onChangeText={setPassword}
-              placeholder="Password (min 8 chars, A-Z, a-z, 0-9, symbol)"
+              placeholder="Password"
               secureTextEntry
               style={{ marginBottom: 8 }}
             />
@@ -222,8 +222,9 @@ const styles = StyleSheet.create({
     width: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 120,
-    marginBottom: 40,
+    paddingTop: 84,
+    paddingBottom: 64,
+    marginHorizontal: 32,
   },
   blurView: {
     width: '92%',
@@ -357,12 +358,10 @@ const styles = StyleSheet.create({
   divider: {
     height: 2,
     backgroundColor: 'rgba(123,47,242,0.22)',
-    marginVertical: 18,
     borderRadius: 2,
   },
   switchBtn: {
     alignItems: 'center',
-    marginTop: 12,
     paddingVertical: 8,
     borderRadius: 8,
   },
@@ -399,7 +398,6 @@ const styles = StyleSheet.create({
   roleSelectorWrap: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginBottom: 18,
     marginTop: 2,
     gap: 8,
   },
@@ -423,5 +421,23 @@ const styles = StyleSheet.create({
   },
   roleBtnTextActive: {
     color: '#fff',
+  },
+  returnToLoginBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 18,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: 'rgba(143,92,255,0.1)',
+    borderWidth: 1,
+    borderColor: '#8F5CFF',
+  },
+  returnToLoginText: {
+    color: '#8F5CFF',
+    fontSize: 15,
+    fontWeight: '500',
+    marginLeft: 8,
   },
 }); 
